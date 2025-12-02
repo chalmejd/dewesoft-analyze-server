@@ -3,7 +3,7 @@ from flask_cors import CORS
 import json
 import subprocess
 import os
-from duty_cycle_opt import optimize_gear, WT_EXP_DEFAULT, GEARS_DEFAULT
+from duty_cycle_opt import optimize_duty_cycle
 
 app = Flask(__name__)
 CORS(app)
@@ -100,44 +100,80 @@ def findPeaks():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route("/optimizeDutyCycle", methods=["POST"])
-def optimize_duty_cycle():
+def optimize_duty_cycle_route():
     try:
         data = request.get_json(force=True) or {}
 
-        gear = data.get("gear", "High")
-        if gear not in GEARS_DEFAULT:
-            return jsonify({"status": "error", "message": f"Unknown gear '{gear}'"}), 400
+        # Label is optional, just for display
+        label = data.get("label", "Custom Scenario")
 
+        # Required: exponents + design life rows
+        wt_exps = data.get("wtExponents", [])
+        design_life_values = data.get("designLifeValues", [])
+
+        if not wt_exps or not design_life_values:
+            return (
+                jsonify(
+                    {
+                        "status": "error",
+                        "message": "wtExponents and designLifeValues are required.",
+                    }
+                ),
+                400,
+            )
+
+        if len(design_life_values) != len(wt_exps):
+            return (
+                jsonify(
+                    {
+                        "status": "error",
+                        "message": "designLifeValues must have the same number of rows as wtExponents.",
+                    }
+                ),
+                400,
+            )
+
+        # Optional parameters (with defaults)
         iter_min = int(data.get("iterMin", 1))
         iter_max = int(data.get("iterMax", 10))
+
         rear_bounds = tuple(map(float, data.get("rearBounds", [0, 4000])))
         front_bounds = tuple(map(float, data.get("frontBounds", [0, 5200])))
         cycle_bounds = tuple(map(float, data.get("cycleBounds", [0, 1e8])))
         max_total_cycles = float(data.get("maxTotalCycles", 1e9))
-        wt_exps = data.get("wtExponents", WT_EXP_DEFAULT)
 
-        result = optimize_gear(
-            gear_name=gear,
+        popsize = int(data.get("popsize", 15))
+        maxiter = int(data.get("maxiter", 40))
+        workers = int(data.get("workers", 1))  # set default to -1 later if you want full parallel
+
+        result = optimize_duty_cycle(
             wt_exp_list=wt_exps,
-            design_life_values=GEARS_DEFAULT[gear],
+            design_life_values=design_life_values,
+            label=label,
             iter_min=iter_min,
             iter_max=iter_max,
             rear_bounds=rear_bounds,
             front_bounds=front_bounds,
             cycle_bounds=cycle_bounds,
             max_total_cycles=max_total_cycles,
-            popsize=int(data.get("popsize", 15)),
-            maxiter=int(data.get("maxiter", 40)),
-            workers=int(data.get("workers", 1)),  # set >1 later for speed
+            popsize=popsize,
+            maxiter=maxiter,
+            workers=workers,
         )
 
         if result is None:
-            return jsonify({"status": "error", "message": "No valid solution found"}), 500
+            return (
+                jsonify(
+                    {"status": "error", "message": "No valid solution found."}
+                ),
+                500,
+            )
 
         return jsonify({"status": "success", "result": result}), 200
 
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
 
 
 def execute_python_script(script_name, file_path):
