@@ -128,17 +128,28 @@ def optimize_duty_cycle(
                 cycle_bounds,
                 max_total_cycles,
             ),
+            # make these reasonably strong by default
+            strategy="best1bin",
             popsize=popsize,
             maxiter=maxiter,
-            tol=0.01,
+            tol=1e-8,
+            mutation=(0.5, 1.0),
+            recombination=0.7,
             updating="deferred",
-            workers=workers,  # set to -1 for "all cores" once tested
+            workers=workers,  # you can set -1 for all cores once happy
         )
 
-        if result.success and result.fun < best_fun:
-            best_fun = result.fun
+        fun = float(result.fun)
+
+        # Skip completely broken runs
+        if not np.isfinite(fun):
+            continue
+
+        # IMPORTANT: no result.success check here – match standalone behavior
+        if fun < best_fun:
+            best_fun = fun
             best_iter_count = iter_count
-            best_overall = np.array(result.x).reshape(iter_count, 3)
+            best_overall = np.array(result.x, dtype=float).reshape(iter_count, 3)
 
     if best_overall is None:
         return None

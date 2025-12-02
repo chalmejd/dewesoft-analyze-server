@@ -143,8 +143,8 @@ def optimize_duty_cycle_route():
         max_total_cycles = float(data.get("maxTotalCycles", 1e9))
 
         popsize = int(data.get("popsize", 15))
-        maxiter = int(data.get("maxiter", 40))
-        workers = int(data.get("workers", 1))  # set default to -1 later if you want full parallel
+        maxiter = int(data.get("maxiter", 1000))
+        workers = int(data.get("workers", -1))  # set default to -1 later if you want full parallel
 
         result = optimize_duty_cycle(
             wt_exp_list=wt_exps,
