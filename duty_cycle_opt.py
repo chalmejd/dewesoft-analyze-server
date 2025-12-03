@@ -1,5 +1,5 @@
-# dewesoft-analyze-server-main/duty_cycle_opt.py
 import numpy as np
+from math import inf
 from scipy.optimize import differential_evolution
 
 
@@ -23,13 +23,16 @@ def calculate_damage(inputs, wt_exp_list, design_life_values):
 
     for rear_torque, front_torque, cycles in inputs:
         for i, exp in enumerate(wt_exp_list):
+            # Total (front + rear)
             total_damage[i] += (
                 ((front_torque + rear_torque) ** exp) * cycles
                 / design_life_values[i, 0]
             )
+            # Rear
             total_damage[i + num_exp] += (
                 (rear_torque**exp) * cycles / design_life_values[i, 1]
             )
+            # Front
             total_damage[i + 2 * num_exp] += (
                 (front_torque**exp) * cycles / design_life_values[i, 2]
             )
@@ -47,31 +50,27 @@ def objective_function(
     cycle_bounds,
     max_total_cycles,
 ):
-    inputs = np.array(flat_inputs).reshape(iter_count, 3)
+    inputs = np.array(flat_inputs, dtype=float).reshape(iter_count, 3)
 
-    # Basic constraints
+    # Constraints
     if np.any(inputs < 0):
-        return np.inf
+        return inf
 
-    # Rear torque bounds
     if np.any((inputs[:, 0] < rear_bounds[0]) | (inputs[:, 0] > rear_bounds[1])):
-        return np.inf
+        return inf
 
-    # Front torque bounds
     if np.any((inputs[:, 1] < front_bounds[0]) | (inputs[:, 1] > front_bounds[1])):
-        return np.inf
+        return inf
 
-    # Cycle bounds
     if np.any((inputs[:, 2] < cycle_bounds[0]) | (inputs[:, 2] > cycle_bounds[1])):
-        return np.inf
+        return inf
 
-    # Total cycles constraint
     if np.sum(inputs[:, 2]) > max_total_cycles:
-        return np.inf
+        return inf
 
     total_damage = calculate_damage(inputs, wt_exp_list, design_life_values)
 
-    # Target is damage ~ 1.0 for each component
+    # EXACTLY like your standalone: target ~1.0 (=> ~100% of design life)
     return np.sqrt(np.mean((total_damage - 1.0) ** 2))
 
 
@@ -86,14 +85,9 @@ def optimize_duty_cycle(
     cycle_bounds=(0.0, 1e8),
     max_total_cycles=1e9,
     popsize=15,
-    maxiter=40,
-    workers=1,
+    maxiter=500,
+    workers=-1,
 ):
-    """
-    wt_exp_list: list of exponents [e1, e2, ...]
-    design_life_values: list of rows [[Total1, Rear1, Front1], [Total2, Rear2, Front2], ...]
-    label: optional string just to tag the scenario
-    """
     wt_exp_list = np.asarray(wt_exp_list, dtype=float)
     design_life_values = np.asarray(design_life_values, dtype=float)
 
@@ -107,7 +101,7 @@ def optimize_duty_cycle(
 
     best_overall = None
     best_iter_count = None
-    best_fun = np.inf
+    best_fun = inf
 
     for iter_count in range(iter_min, iter_max + 1):
         bounds = []
@@ -116,7 +110,7 @@ def optimize_duty_cycle(
             bounds.append(front_bounds)  # front torque
             bounds.append(cycle_bounds)  # cycles
 
-        result = differential_evolution(
+        res = differential_evolution(
             objective_function,
             bounds=bounds,
             args=(
@@ -128,28 +122,26 @@ def optimize_duty_cycle(
                 cycle_bounds,
                 max_total_cycles,
             ),
-            # make these reasonably strong by default
             strategy="best1bin",
-            popsize=popsize,
             maxiter=maxiter,
+            popsize=popsize,
             tol=1e-8,
             mutation=(0.5, 1.0),
             recombination=0.7,
             updating="deferred",
-            workers=workers,  # you can set -1 for all cores once happy
+            workers=workers,  # keep 1 for now; you can go to -1 later
+            seed=42,          # matches your standalone DE_PARAMS_DEFAULT
         )
 
-        fun = float(result.fun)
-
-        # Skip completely broken runs
+        fun = float(res.fun)
         if not np.isfinite(fun):
             continue
 
-        # IMPORTANT: no result.success check here – match standalone behavior
+        # IMPORTANT: no res.success check (your original didn't use it)
         if fun < best_fun:
             best_fun = fun
             best_iter_count = iter_count
-            best_overall = np.array(result.x, dtype=float).reshape(iter_count, 3)
+            best_overall = res.x.reshape(iter_count, 3)
 
     if best_overall is None:
         return None
@@ -159,7 +151,7 @@ def optimize_duty_cycle(
     return {
         "label": label,
         "best_iter": int(best_iter_count),
-        "rows": best_overall.tolist(),      # [ [rear, front, cycles], ... ]
-        "damage": damage.tolist(),          # flattened list: [Total_exp1.., Rear_exp1.., Front_exp1..]
+        "rows": best_overall.tolist(),
+        "damage": damage.tolist(),        # fractions of design life (1.0 => 100%)
         "wt_exponents": wt_exp_list.tolist(),
     }
