@@ -265,48 +265,67 @@ def coastdown_channels():
 @app.route("/api/coastdown/preprocess", methods=["POST"])
 def coastdown_preprocess():
     """
-    Runs coastdown preprocessing after the user selects a wheel speed channel.
+    Runs coastdown preprocessing.
 
     Request: JSON
       {
         "mf4_path": "...",
         "dbc_path": "...",
-        "selected_speed_channel": "...",
-        "vehicle_mass_kg": 1234.5
+        "speed_channels": ["WheelSpeed_FL"],   # required (1 or more)
+        "combine_method": "mean",              # optional
+        "vehicle_mass_kg": 1234.5,             # required
+        "speed_units_mode": "auto",            # optional: auto|km/h|m/s|mph
+        "resample_interval_s": 0.02,           # optional
+        "smoothing_window": 11                 # optional
       }
-
-    Response: JSON returned by coastdown_preprocess.py (meta + data)
     """
     try:
         payload = request.get_json(force=True) or {}
 
         mf4_path = payload.get("mf4_path")
         dbc_path = payload.get("dbc_path")
-        selected_channel = payload.get("selected_speed_channel")
+
+        speed_channels = payload.get("speed_channels") or []
+        combine_method = payload.get("combine_method", "mean")
         vehicle_mass_kg = payload.get("vehicle_mass_kg")
+
+        speed_units_mode = payload.get("speed_units_mode", "auto")
+        resample_interval_s = payload.get("resample_interval_s", None)
+        smoothing_window = payload.get("smoothing_window", None)
 
         if not mf4_path or not dbc_path:
             return jsonify({"status": "error", "message": "mf4_path and dbc_path are required."}), 400
-        if not selected_channel:
-            return jsonify({"status": "error", "message": "selected_speed_channel is required."}), 400
+
+        if not isinstance(speed_channels, list) or len(speed_channels) == 0:
+            return jsonify({"status": "error", "message": "speed_channels must be a non-empty list."}), 400
+
         if vehicle_mass_kg is None:
             return jsonify({"status": "error", "message": "vehicle_mass_kg is required."}), 400
+
+        preprocess_config = {
+            "speed_channels": speed_channels,
+            "combine_method": combine_method,
+            "vehicle_mass_kg": float(vehicle_mass_kg),
+            "speed_units_mode": speed_units_mode,
+            "resample_interval_s": resample_interval_s,
+            "smoothing_window": smoothing_window,
+        }
 
         result = execute_simple_script(
             "coastdown_preprocess",
             mf4_path,
             dbc_path,
-            selected_channel,
-            str(float(vehicle_mass_kg)),
+            json.dumps(preprocess_config),
         )
 
         parsed = safe_parse_json_stdout(result.get("output", ""))
 
-        # If script reported an error via stderr, surface it
         if "error" in result and result["error"]:
             return jsonify({"status": "error", "message": result["error"]}), 500
 
-        # If parsed is dict, return it; otherwise wrap it
+        if isinstance(parsed, dict) and parsed.get("error"):
+            return jsonify({"status": "error", "message": parsed["error"]}), 500
+
         if isinstance(parsed, dict):
             return jsonify({"status": "success", "result": parsed}), 200
 
@@ -314,6 +333,115 @@ def coastdown_preprocess():
 
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route("/api/coastdown/segments", methods=["POST"])
+def coastdown_segments():
+    """
+    Detects coastdown segments.
+
+    Request JSON:
+    {
+      "mf4_path": "...",
+      "dbc_path": "...",
+      "preprocess_config": {...},
+      "segment_config": {...}
+    }
+    """
+    try:
+        payload = request.get_json(force=True) or {}
+
+        mf4_path = payload.get("mf4_path")
+        dbc_path = payload.get("dbc_path")
+        preprocess_config = payload.get("preprocess_config") or {}
+        segment_config = payload.get("segment_config") or {}
+
+        if not mf4_path or not dbc_path:
+            return jsonify({"status": "error", "message": "mf4_path and dbc_path are required."}), 400
+
+        result = execute_simple_script(
+            "coastdown_detect_segments",
+            mf4_path,
+            dbc_path,
+            json.dumps(preprocess_config),
+            json.dumps(segment_config),
+        )
+
+        parsed = safe_parse_json_stdout(result.get("output", ""))
+
+        if "error" in result and result["error"]:
+            return jsonify({"status": "error", "message": result["error"]}), 500
+
+        if isinstance(parsed, dict) and parsed.get("error"):
+            return jsonify({"status": "error", "message": parsed["error"]}), 500
+
+        return jsonify({"status": "success", "result": parsed}), 200
+
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route("/api/coastdown/fit", methods=["POST"])
+def coastdown_fit():
+    """
+    Fits A/B/C coefficients.
+
+    Request JSON:
+    {
+      "mf4_path": "...",
+      "dbc_path": "...",
+      "preprocess_config": {...},
+      "segments": [...],
+      "segment_ids": [1,2,3]
+    }
+    """
+    try:
+        payload = request.get_json(force=True) or {}
+
+        mf4_path = payload.get("mf4_path")
+        dbc_path = payload.get("dbc_path")
+        preprocess_config = payload.get("preprocess_config") or {}
+        segments = payload.get("segments") or []
+        if isinstance(segments, dict) and "segments" in segments:
+            segments = segments["segments"]
+
+        segment_ids = payload.get("segment_ids") or []
+        if not isinstance(segment_ids, list) or len(segment_ids) == 0:
+            return jsonify({"status": "error", "message": "segment_ids must be a non-empty list."}), 400
+
+        segment_ids = [int(x) for x in segment_ids]
+
+
+        if not mf4_path or not dbc_path:
+            return jsonify({"status": "error", "message": "mf4_path and dbc_path are required."}), 400
+
+        if not segment_ids:
+            return jsonify({"status": "error", "message": "segment_ids must be a non-empty list."}), 400
+
+        fit_config = {
+            "segments": segments,
+            "segment_ids": segment_ids,
+        }
+
+        result = execute_simple_script(
+            "coastdown_fit_coefficients",
+            mf4_path,
+            dbc_path,
+            json.dumps(preprocess_config),
+            json.dumps(fit_config),
+        )
+
+        parsed = safe_parse_json_stdout(result.get("output", ""))
+
+        if "error" in result and result["error"]:
+            return jsonify({"status": "error", "message": result["error"]}), 500
+
+        if isinstance(parsed, dict) and parsed.get("error"):
+            return jsonify({"status": "error", "message": parsed["error"]}), 500
+
+        return jsonify({"status": "success", "result": parsed}), 200
+
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 
 
 # -------------------------------------------------------------------
@@ -366,23 +494,29 @@ def execute_peaks_script(script_name, file_path, load_channel, rev_channel, prom
 
 def execute_simple_script(script_name: str, *args: str):
     """
-    Generic script runner for scripts that just take argv args and output JSON/text to stdout.
-    Uses shell=True for consistent quoting behavior with existing code style.
+    Safe script runner that avoids shell-escaping issues with JSON.
     """
     try:
-        quoted_args = " ".join([f"\"{a}\"" for a in args])
-        command = f"python {script_name}.py {quoted_args}"
-        print(command)
-        result = subprocess.run(command, text=True, capture_output=True, shell=True)
+        cmd = ["python", f"{script_name}.py"]
+        cmd.extend(args)
+
+        print("EXEC:", cmd)
+
+        result = subprocess.run(
+            cmd,
+            text=True,
+            capture_output=True,
+            shell=False,   # ✅ IMPORTANT
+        )
 
         if result.returncode == 0:
             return {"output": result.stdout}
         else:
-            # keep stderr for debugging
             return {"error": result.stderr, "output": result.stdout}
 
     except Exception as e:
         return {"error": str(e)}
+
 
 
 if __name__ == "__main__":
