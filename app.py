@@ -62,12 +62,25 @@ def safe_parse_json_stdout(stdout: str):
         return s
 
 
+def cleanup_file(file_path: str):
+    """
+    Safely deletes an uploaded file.
+    Does nothing if file doesn't exist.
+    """
+    try:
+        if file_path and os.path.exists(file_path):
+            os.remove(file_path)
+    except Exception as e:
+        print(f"Warning: Could not delete {file_path}: {e}")
+
+
 # -------------------------------------------------------------------
 # Existing endpoints
 # -------------------------------------------------------------------
 
 @app.route("/run_python", methods=["POST"])
 def run_python():
+    file_path = None
     try:
         if "file" not in request.files:
             return jsonify({"status": "error", "message": "No file uploaded"}), 400
@@ -84,10 +97,13 @@ def run_python():
 
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        cleanup_file(file_path)
 
 
 @app.route("/run_calcs", methods=["POST"])
 def run_calcs():
+    file_path = None
     try:
         if "file" not in request.files:
             return jsonify({"status": "error", "message": "No file uploaded"}), 400
@@ -112,10 +128,13 @@ def run_calcs():
 
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        cleanup_file(file_path)
 
 
 @app.route("/findPeaks", methods=["POST"])
 def findPeaks():
+    file_path = None
     try:
         if "file" not in request.files:
             return jsonify({"status": "error", "message": "No file uploaded"}), 400
@@ -141,6 +160,8 @@ def findPeaks():
 
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        cleanup_file(file_path)
 
 
 @app.route("/optimizeDutyCycle", methods=["POST"])
@@ -393,6 +414,8 @@ def coastdown_fit():
       "segment_ids": [1,2,3]
     }
     """
+    mf4_path = None
+    dbc_path = None
     try:
         payload = request.get_json(force=True) or {}
 
@@ -441,6 +464,9 @@ def coastdown_fit():
 
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        cleanup_file(mf4_path)
+        cleanup_file(dbc_path)
 
 
 
