@@ -1,0 +1,19 @@
+enabled,table,register,name,type,scale,units,signed,bit,bit_name,word_order,description
+true,holding,1,Motor Voltage Signal,int16,1,,true,,,high_low,Controller tag comment names Server_01_Data.HOLDREGISTERS_4XXX[1] as Motor Voltage Signal. Ladder copies Local:3:O.Ch1Data into this register.
+true,holding,2,Output Load Signal,int16,1,,true,,,high_low,Controller tag comment names Server_01_Data.HOLDREGISTERS_4XXX[2] as Output Load Signal. Ladder copies Local:3:O.Ch2Data into this register.
+true,holding,3,Front Load Signal,int16,1,,true,,,high_low,Controller tag comment names Server_01_Data.HOLDREGISTERS_4XXX[3] as Front Load Signal. Ladder copies Local:3:O.Ch3Data into this register.
+true,holding,4,Gear Position,int16,1,,true,,,high_low,Controller tag comment names Server_01_Data.HOLDREGISTERS_4XXX[4] as Gear Position. Ladder copies GearPositionBlock.TransGearPosition into this register.
+true,holding,5,Channel 4 Output / Unknown,int16,1,,true,,,high_low,Ladder copies Local:3:O.Ch4Data into this register. No matching controller tag comment found for the engineering meaning.
+true,holding,6,Analog Input Channel 8,int16,1,,true,,,high_low,Ladder copies Analog_In_Ch8 into this register. Engineering units not identified from provided files.
+true,holding,7,Cycle Count Final Step 2,int16,1,count,true,,,high_low,"Ladder copies Cycle_Count_Holder_Final_Step_2 into this register. Source tag is DINT, but Modbus register storage is INT."
+true,holding,8,Cycle Count Final Step 4,int16,1,count,true,,,high_low,"Ladder copies Cycle_Count_Holder_Final_Step_4 into this register. Source tag is DINT, but Modbus register storage is INT."
+true,holding,9,Cycle Count Final Step 6,int16,1,count,true,,,high_low,"Ladder copies Cycle_Count_Holder_Final_Step_6 into this register. Source tag is DINT, but Modbus register storage is INT."
+true,holding,10,Cycle Count Final Step 7,int16,1,count,true,,,high_low,"Ladder copies Cycle_Count_Holder_Final_Step_7 into this register. Source tag is DINT, but Modbus register storage is INT."
+true,holding,11,Cycle Count Final Step 9,int16,1,count,true,,,high_low,"Ladder copies Cycle_Count_Holder_Final_Step_9 into this register. Source tag is DINT, but Modbus register storage is INT."
+true,holding,12,Step Timer ACC,int16,1,,true,,,high_low,"Ladder copies Step_Timer.ACC into this register. Source tag is TIMER.ACC (DINT milliseconds in Logix), but Modbus register storage is INT."
+true,holding,13,Step Counter ACC,int16,1,count,true,,,high_low,"Ladder copies Step_Counter.ACC into this register. Source tag is COUNTER.ACC (DINT), but Modbus register storage is INT."
+true,holding,14,Hours ACC,int16,1,count,true,,,high_low,"Ladder copies Hours.ACC into this register. Source tag is COUNTER.ACC (DINT), but Modbus register storage is INT."
+true,holding,15,Cycle Time Min,int16,1,min,true,,,high_low,Ladder copies Cycle_Time_Min into this register.
+true,holding,16,Analog U0 Scaled,int16,1,,true,,,high_low,Ladder copies anlgU0.Scale.Scaled into this register. Exact sensor meaning not identified from provided files.
+true,holding,17,Rate 0,int16,1,,true,,,high_low,Ladder copies Rate_0 into this register. Controller comments mention Over Rev and Under Rev on Rate Channel 0.
+true,holding,18,Front RPM / Rate 1,int16,1,rpm,true,,,high_low,"Ladder copies Rate_1 into this register. Separate controller tag comment labels Client_01_Data.HOLDREGISTERS_4XXX[18] as Front RPM, so this likely represents a front RPM / rate channel."

@@ -1,0 +1,7 @@
+name,ip,unit_id,enabled,table,start_address,register_count
+TS-02,10.12.4.193,1,true,holding,0,20
+TS-05,10.12.0.137,1,true,holding,0,20
+TS-06,10.12.2.87,1,true,holding,0,20
+TS-07,10.12.2.86,1,true,holding,0,20
+East Noise Room,10.12.5.18,1,true,holding,0,20
+Point IO,10.12.5.41,1,true,holding,0,20

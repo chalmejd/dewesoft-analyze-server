@@ -7,9 +7,12 @@ import uuid
 from werkzeug.utils import secure_filename
 
 from duty_cycle_opt import optimize_duty_cycle
+from testing_dashboard_backend import register_testing_dashboard_routes
 
 app = Flask(__name__)
 CORS(app)
+
+register_testing_dashboard_routes(app)
 
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
